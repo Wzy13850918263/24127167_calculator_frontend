@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>前后端分离计算器</title>
+    <style>
+        *{box-sizing:border-box; font-family:Arial;}
+        body{background:#f0f2f5; margin:0; padding:20px;}
+        .container{width:420px;margin:30px auto;background:#fff;padding:24px;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.1);}
+        h2{text-align:center;margin-top:0;}
+        #input-area{width:100%;padding:12px;font-size:24px;text-align:right;margin-bottom:10px;border:1px solid #ddd;border-radius:8px;}
+        .btn-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+        button{padding:16px;font-size:20px;cursor:pointer;border:1px solid #ddd;border-radius:8px;background:#fafafa;}
+        button:hover{background:#eef;}
+        #result{font-size:22px;height:30px;text-align:right;margin:10px 0;color:#222;}
+        .history{margin-top:20px;}
+        .history-item{display:flex;justify-content:space-between;align-items:center;padding:8px;border-bottom:1px solid #eee;}
+        .del-btn{color:red;cursor:pointer;border:none;background:none;font-size:14px;}
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>计算器（后端运算）</h2>
+    <input id="input-area" readonly placeholder="请点击按钮输入表达式">
+    <div id="result"></div>
+    <div class="btn-grid">
+        <button onclick="appendChar('(')">(</button>
+        <button onclick="appendChar(')')">)</button>
+        <button onclick="appendChar('/')">/</button>
+        <button onclick="appendChar('*')">*</button>
+
+        <button onclick="appendChar('7')">7</button>
+        <button onclick="appendChar('8')">8</button>
+        <button onclick="appendChar('9')">9</button>
+        <button onclick="appendChar('-')">-</button>
+
+        <button onclick="appendChar('4')">4</button>
+        <button onclick="appendChar('5')">5</button>
+        <button onclick="appendChar('6')">6</button>
+        <button onclick="appendChar('+')">+</button>
+
+        <button onclick="appendChar('1')">1</button>
+        <button onclick="appendChar('2')">2</button>
+        <button onclick="appendChar('3')">3</button>
+        <button onclick="clearInput()">C</button>
+
+        <button onclick="appendChar('0')">0</button>
+        <button onclick="appendChar('.')">.</button>
+        <button onclick="submitCalc()" style="grid-column: span 2; background:#4a90d9;color:#fff;">=</button>
+    </div>
+
+    <div class="history">
+        <h3>计算历史</h3>
+        <div id="history-list"></div>
+    </div>
+</div>
+
+<script>
+// 后端地址！本地调试用这个，部署公网时改成你的公网地址
+const BACKEND_URL = "http://127.0.0.1:8000";
+const inputDom = document.getElementById("input-area");
+const resultDom = document.getElementById("result");
+const historyDom = document.getElementById("history-list");
+
+function appendChar(c){
+    inputDom.value += c;
+}
+function clearInput(){
+    inputDom.value = "";
+    resultDom.innerText = "";
+}
+
+async function submitCalc(){
+    const expr = inputDom.value.trim();
+    if(!expr) return;
+    try{
+        const resp = await fetch(BACKEND_URL + "/api/calculate",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body: JSON.stringify({expression:expr})
+        })
+        const data = await resp.json();
+        if(data.success){
+            resultDom.innerText = "结果 = " + data.result;
+        }else{
+            resultDom.innerText = "错误：" + data.message;
+        }
+        loadHistory();
+    }catch(err){
+        resultDom.innerText = "网络错误，请检查后端是否启动";
+    }
+}
+
+async function loadHistory(){
+    const resp = await fetch(BACKEND_URL + "/api/history");
+    const data = await resp.json();
+    historyDom.innerHTML = "";
+    data.history.forEach(item=>{
+        const div = document.createElement("div");
+        div.className = "history-item";
+        div.innerHTML = "<span>" + item.expression + " = " + item.result + "</span>" +
+                        "<button class='del-btn' onclick='deleteRecord(" + item.id + ")'>删除</button>";
+        historyDom.appendChild(div);
+    })
+}
+
+async function deleteRecord(id){
+    await fetch(BACKEND_URL + "/api/history/" + id, {method:"DELETE"});
+    loadHistory();
+}
+
+window.onload = function(){
+    loadHistory();
+}
+</script>
+</body>
+</html>
